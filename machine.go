@@ -378,6 +378,12 @@ func NewMachine(ctx context.Context, cfg Config, opts ...Opt) (*Machine, error) 
 
 	m.Handlers = defaultHandlers
 
+	if m.logger == nil {
+		logger := log.New()
+
+		m.logger = log.NewEntry(logger)
+	}
+
 	if cfg.JailerCfg != nil {
 		m.Handlers.Validation = m.Handlers.Validation.Append(JailerConfigValidationHandler)
 		if err := jail(ctx, m, &cfg); err != nil {
@@ -385,13 +391,10 @@ func NewMachine(ctx context.Context, cfg Config, opts ...Opt) (*Machine, error) 
 		}
 	} else {
 		m.Handlers.Validation = m.Handlers.Validation.Append(ConfigValidationHandler)
-		m.cmd = configureBuilder(defaultFirecrackerVMMCommandBuilder, cfg).Build(ctx)
-	}
-
-	if m.logger == nil {
-		logger := log.New()
-
-		m.logger = log.NewEntry(logger)
+		m.cmd = configureBuilder(defaultFirecrackerVMMCommandBuilder, cfg).
+			WithStdout(m.logger.WriterLevel(log.InfoLevel)).
+			WithStderr(m.logger.WriterLevel(log.ErrorLevel)).
+			Build(ctx)
 	}
 
 	if m.client == nil {
