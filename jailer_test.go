@@ -352,6 +352,46 @@ func TestJail(t *testing.T) {
 				rootfsFolderName,
 				"api.sock"),
 		},
+		{
+			name: "firecracker flags",
+			jailerCfg: JailerConfig{
+				ID:             "my-test-id",
+				UID:            Int(123),
+				GID:            Int(100),
+				NumaNode:       Int(0),
+				ChrootStrategy: NewNaiveChrootStrategy("kernel-image-path"),
+				ExecFile:       "/path/to/firecracker",
+			},
+			expectedArgs: []string{
+				defaultJailerBin,
+				"--id",
+				"my-test-id",
+				"--uid",
+				"123",
+				"--gid",
+				"100",
+				"--exec-file",
+				"/path/to/firecracker",
+				"--cgroup",
+				"cpuset.mems=0",
+				"--cgroup",
+				fmt.Sprintf("cpuset.cpus=%s", getNumaCpuset(0)),
+				"--",
+				"--no-seccomp",
+				"--api-sock",
+				"/run/firecracker.socket",
+				"--enable-pci",
+				"--module",
+				"api_server::request",
+			},
+			expectedSockPath: filepath.Join(
+				defaultJailerPath,
+				"firecracker",
+				"my-test-id",
+				rootfsFolderName,
+				"run",
+				"firecracker.socket"),
+		},
 	}
 	for _, c := range testCases {
 		t.Run(c.name, func(t *testing.T) {
@@ -365,6 +405,13 @@ func TestJail(t *testing.T) {
 				JailerCfg:  &c.jailerCfg,
 				NetNS:      c.netns,
 				SocketPath: c.socketPath,
+				EnablePCI:  c.name == "firecracker flags",
+				LogModule: func() string {
+					if c.name == "firecracker flags" {
+						return "api_server::request"
+					}
+					return ""
+				}(),
 			}
 			jail(context.Background(), m, cfg)
 

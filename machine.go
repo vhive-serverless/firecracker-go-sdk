@@ -118,6 +118,15 @@ type Config struct {
 	// microVM.
 	Drives []models.Drive
 
+	// PmemDevices specifies virtio-pmem devices to add pre-boot.
+	PmemDevices []models.Pmem
+
+	// SerialDevice configures the serial console output.
+	SerialDevice *models.SerialDevice
+
+	// MemoryHotplug configures the hotpluggable memory device.
+	MemoryHotplug *models.MemoryHotplugConfig
+
 	// NetworkInterfaces specifies the tap devices that should be made available
 	// to the microVM.
 	NetworkInterfaces NetworkInterfaces
@@ -167,6 +176,12 @@ type Config struct {
 	// If not provided, the default version (1) will be used.
 	MmdsVersion MMDSVersion
 
+	// EnablePCI toggles the Firecracker PCIe device model.
+	EnablePCI bool
+
+	// LogModule filters Firecracker logs by module path.
+	LogModule string
+
 	// Configuration for snapshot loading
 	Snapshot SnapshotConfig
 }
@@ -194,7 +209,7 @@ func (cfg *Config) Validate() error {
 
 	for _, drive := range cfg.Drives {
 		if BoolValue(drive.IsRootDevice) {
-			rootPath := StringValue(drive.PathOnHost)
+			rootPath := drive.PathOnHost
 			if _, err := os.Stat(rootPath); err != nil {
 				return fmt.Errorf("failed to stat host drive path, %q: %v", rootPath, err)
 			}
@@ -225,7 +240,7 @@ func (cfg *Config) ValidateLoadSnapshot() error {
 	}
 
 	for _, drive := range cfg.Drives {
-		rootPath := StringValue(drive.PathOnHost)
+		rootPath := drive.PathOnHost
 		if _, err := os.Stat(rootPath); err != nil {
 			return fmt.Errorf("failed to stat drive path, %q: %v", rootPath, err)
 		}
@@ -351,11 +366,24 @@ func seccompArgs(cfg *Config) []string {
 	return args
 }
 
+func firecrackerFlagArgs(cfg *Config) []string {
+	var args []string
+	if cfg.EnablePCI {
+		args = append(args, "--enable-pci")
+	}
+	if cfg.LogModule != "" {
+		args = append(args, "--module", cfg.LogModule)
+	}
+	return args
+}
+
 func configureBuilder(builder VMCommandBuilder, cfg Config) VMCommandBuilder {
+	flagArgs := firecrackerFlagArgs(&cfg)
 	return builder.
 		WithSocketPath(cfg.SocketPath).
 		AddArgs("--id", cfg.VMID).
-		AddArgs(seccompArgs(&cfg)...)
+		AddArgs(seccompArgs(&cfg)...).
+		AddArgs(flagArgs...)
 }
 
 // NewMachine initializes a new Machine instance and performs validation of the
@@ -539,10 +567,10 @@ func (m *Machine) addVsocks(ctx context.Context, vsocks ...VsockDevice) error {
 func (m *Machine) attachDrives(ctx context.Context, drives ...models.Drive) error {
 	for _, dev := range drives {
 		if err := m.attachDrive(ctx, dev); err != nil {
-			m.logger.Errorf("While attaching drive %s, got error %s", StringValue(dev.PathOnHost), err)
+			m.logger.Errorf("While attaching drive %s, got error %s", dev.PathOnHost, err)
 			return err
 		}
-		m.logger.Debugf("attachDrive returned for %s", StringValue(dev.PathOnHost))
+		m.logger.Debugf("attachDrive returned for %s", dev.PathOnHost)
 	}
 
 	return nil
@@ -714,7 +742,7 @@ func (m *Machine) setupLogging(ctx context.Context) error {
 	}
 
 	l := models.Logger{
-		LogPath:       String(path),
+		LogPath:       path,
 		Level:         level,
 		ShowLevel:     Bool(true),
 		ShowLogOrigin: Bool(false),
@@ -892,7 +920,7 @@ func (m *Machine) UpdateGuestNetworkInterfaceRateLimit(ctx context.Context, ifac
 
 // attachDrive attaches a secondary block device
 func (m *Machine) attachDrive(ctx context.Context, dev models.Drive) error {
-	hostPath := StringValue(dev.PathOnHost)
+	hostPath := dev.PathOnHost
 	m.logger.Infof("Attaching drive %s, slot %s, root %t.", hostPath, StringValue(dev.DriveID), BoolValue(dev.IsRootDevice))
 	respNoContent, err := m.client.PutGuestDriveByID(ctx, StringValue(dev.DriveID), &dev)
 	if err == nil {
@@ -1190,10 +1218,12 @@ func (m *Machine) loadSnapshot(ctx context.Context, snapshot *SnapshotConfig) er
 		SnapshotPath:        &snapshot.SnapshotPath,
 		EnableDiffSnapshots: snapshot.EnableDiffSnapshots,
 		ResumeVM:            snapshot.ResumeVM,
+		NetworkOverrides:    snapshot.NetworkOverrides,
+		VsockOverride:       snapshot.VsockOverride,
 	}
 
 	if _, err := m.client.LoadSnapshot(ctx, snapshotParams); err != nil {
-		return fmt.Errorf("failed to load a snapshot for VM: %v", err)
+		return fmt.Errorf("failed to load a snapshot for VM: %w", err)
 	}
 
 	m.logger.Debug("snapshot loaded successfully")
@@ -1274,4 +1304,118 @@ func (m *Machine) UpdateBalloonStats(ctx context.Context, statsPollingIntervals 
 
 	m.logger.Debug("UpdateBalloonStats successful")
 	return nil
+}
+
+// StartBalloonHinting starts a free page hinting run.
+func (m *Machine) StartBalloonHinting(ctx context.Context, acknowledgeOnStop bool, opts ...StartBalloonHintingOpt) error {
+	cmd := models.BalloonStartCmd{
+		AcknowledgeOnStop: acknowledgeOnStop,
+	}
+
+	if _, err := m.client.StartBalloonHinting(ctx, &cmd, opts...); err != nil {
+		m.logger.Errorf("StartBalloonHinting failed: %v", err)
+		return err
+	}
+
+	m.logger.Debug("StartBalloonHinting successful")
+	return nil
+}
+
+// StopBalloonHinting stops a free page hinting run.
+func (m *Machine) StopBalloonHinting(ctx context.Context, opts ...StopBalloonHintingOpt) error {
+	if _, err := m.client.StopBalloonHinting(ctx, opts...); err != nil {
+		m.logger.Errorf("StopBalloonHinting failed: %v", err)
+		return err
+	}
+
+	m.logger.Debug("StopBalloonHinting successful")
+	return nil
+}
+
+// GetBalloonHintingStatus retrieves the hinting status from the balloon device.
+func (m *Machine) GetBalloonHintingStatus(ctx context.Context, opts ...DescribeBalloonHintingOpt) (models.BalloonHintingStatus, error) {
+	var status models.BalloonHintingStatus
+	resp, err := m.client.DescribeBalloonHinting(ctx, opts...)
+	if err != nil {
+		m.logger.Errorf("Getting balloon hinting status: %v", err)
+		return status, err
+	}
+	status = *resp.Payload
+	m.logger.Debug("GetBalloonHintingStatus successful")
+	return status, nil
+}
+
+// AddPmemDevices configures virtio-pmem devices pre-boot.
+func (m *Machine) AddPmemDevices(ctx context.Context, devices ...models.Pmem) error {
+	for _, dev := range devices {
+		id := StringValue(dev.ID)
+		if id == "" {
+			return fmt.Errorf("pmem device ID is required")
+		}
+		if _, err := m.client.PutGuestPmemByID(ctx, id, &dev); err != nil {
+			m.logger.Errorf("Add pmem device failed: %s: %v", id, err)
+			return err
+		}
+		m.logger.Debugf("Added pmem device %s", id)
+	}
+
+	return nil
+}
+
+// ConfigureSerial configures the serial console output.
+func (m *Machine) ConfigureSerial(ctx context.Context, serial *models.SerialDevice, opts ...PutSerialDeviceOpt) error {
+	if serial == nil {
+		return nil
+	}
+
+	if _, err := m.client.PutSerialDevice(ctx, serial, opts...); err != nil {
+		m.logger.Errorf("Configure serial device failed: %v", err)
+		return err
+	}
+
+	m.logger.Debug("Configure serial device successful")
+	return nil
+}
+
+// ConfigureMemoryHotplug configures the hotpluggable memory device.
+func (m *Machine) ConfigureMemoryHotplug(ctx context.Context, config *models.MemoryHotplugConfig, opts ...PutMemoryHotplugOpt) error {
+	if config == nil {
+		return nil
+	}
+
+	if _, err := m.client.PutMemoryHotplug(ctx, config, opts...); err != nil {
+		m.logger.Errorf("Configure memory hotplug failed: %v", err)
+		return err
+	}
+
+	m.logger.Debug("Configure memory hotplug successful")
+	return nil
+}
+
+// UpdateMemoryHotplug updates the size of the hotpluggable memory region.
+func (m *Machine) UpdateMemoryHotplug(ctx context.Context, requestedSizeMib int64, opts ...PatchMemoryHotplugOpt) error {
+	update := models.MemoryHotplugSizeUpdate{
+		RequestedSizeMib: Int64(requestedSizeMib),
+	}
+
+	if _, err := m.client.PatchMemoryHotplug(ctx, &update, opts...); err != nil {
+		m.logger.Errorf("Update memory hotplug failed: %v", err)
+		return err
+	}
+
+	m.logger.Debug("Update memory hotplug successful")
+	return nil
+}
+
+// GetMemoryHotplug returns the status of the hotpluggable memory device.
+func (m *Machine) GetMemoryHotplug(ctx context.Context, opts ...GetMemoryHotplugOpt) (models.MemoryHotplugStatus, error) {
+	var status models.MemoryHotplugStatus
+	resp, err := m.client.GetMemoryHotplug(ctx, opts...)
+	if err != nil {
+		m.logger.Errorf("Getting memory hotplug status: %v", err)
+		return status, err
+	}
+	status = *resp.Payload
+	m.logger.Debug("GetMemoryHotplug successful")
+	return status, nil
 }

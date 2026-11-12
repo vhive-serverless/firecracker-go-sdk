@@ -49,9 +49,9 @@ func TestClient(t *testing.T) {
 
 	drive := &models.Drive{
 		DriveID:      String("test"),
-		IsReadOnly:   Bool(false),
+		IsReadOnly:   false,
 		IsRootDevice: Bool(false),
-		PathOnHost:   String(filepath.Join(testDataPath, "drive-2.img")),
+		PathOnHost:   filepath.Join(testDataPath, "drive-2.img"),
 	}
 
 	client := NewClient(socketpath, fctesting.NewLogEntry(t), true)

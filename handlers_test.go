@@ -592,6 +592,64 @@ func TestHandlers(t *testing.T) {
 			},
 		},
 		{
+			Handler: CreatePmemHandler,
+			Client: fctesting.MockClient{
+				PutGuestPmemByIDFn: func(params *ops.PutGuestPmemByIDParams) (*ops.PutGuestPmemByIDNoContent, error) {
+					called = CreatePmemHandler.Name
+					if params.ID != "pmem0" {
+						return nil, fmt.Errorf("incorrect pmem id: %s", params.ID)
+					}
+					if params.Body == nil || *params.Body.ID != "pmem0" {
+						return nil, fmt.Errorf("incorrect pmem body id: %v", params.Body)
+					}
+					return &ops.PutGuestPmemByIDNoContent{}, nil
+				},
+			},
+			Config: Config{
+				PmemDevices: []models.Pmem{
+					{
+						ID:         String("pmem0"),
+						PathOnHost: String("/tmp/pmem0"),
+						ReadOnly:   true,
+					},
+				},
+			},
+		},
+		{
+			Handler: CreateSerialHandler,
+			Client: fctesting.MockClient{
+				PutSerialDeviceFn: func(params *ops.PutSerialDeviceParams) (*ops.PutSerialDeviceNoContent, error) {
+					called = CreateSerialHandler.Name
+					if params.Body == nil || params.Body.SerialOutPath != "/tmp/serial.log" {
+						return nil, fmt.Errorf("incorrect serial device: %v", params.Body)
+					}
+					return &ops.PutSerialDeviceNoContent{}, nil
+				},
+			},
+			Config: Config{
+				SerialDevice: &models.SerialDevice{SerialOutPath: "/tmp/serial.log"},
+			},
+		},
+		{
+			Handler: CreateMemoryHotplugHandler,
+			Client: fctesting.MockClient{
+				PutMemoryHotplugFn: func(params *ops.PutMemoryHotplugParams) (*ops.PutMemoryHotplugNoContent, error) {
+					called = CreateMemoryHotplugHandler.Name
+					if params.Body == nil || params.Body.TotalSizeMib != 512 {
+						return nil, fmt.Errorf("incorrect memory hotplug config: %v", params.Body)
+					}
+					return &ops.PutMemoryHotplugNoContent{}, nil
+				},
+			},
+			Config: Config{
+				MemoryHotplug: &models.MemoryHotplugConfig{
+					BlockSizeMib: 2,
+					SlotSizeMib:  128,
+					TotalSizeMib: 512,
+				},
+			},
+		},
+		{
 			Handler: CreateNetworkInterfacesHandler,
 			Client: fctesting.MockClient{
 				PutGuestNetworkInterfaceByIDFn: func(params *ops.PutGuestNetworkInterfaceByIDParams) (*ops.PutGuestNetworkInterfaceByIDNoContent, error) {

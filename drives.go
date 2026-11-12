@@ -42,9 +42,9 @@ type DriveOpt func(*models.Drive)
 func (b DrivesBuilder) WithRootDrive(rootDrivePath string, opts ...DriveOpt) DrivesBuilder {
 	b.rootDrive = models.Drive{
 		DriveID:      String(rootDriveName),
-		PathOnHost:   &rootDrivePath,
+		PathOnHost:   rootDrivePath,
 		IsRootDevice: Bool(true),
-		IsReadOnly:   Bool(false),
+		IsReadOnly:   false,
 	}
 
 	for _, opt := range opts {
@@ -58,9 +58,9 @@ func (b DrivesBuilder) WithRootDrive(rootDrivePath string, opts ...DriveOpt) Dri
 func (b DrivesBuilder) AddDrive(path string, readOnly bool, opts ...DriveOpt) DrivesBuilder {
 	drive := models.Drive{
 		DriveID:      String(strconv.Itoa(len(b.drives))),
-		PathOnHost:   &path,
+		PathOnHost:   path,
 		IsRootDevice: Bool(false),
-		IsReadOnly:   &readOnly,
+		IsReadOnly:   readOnly,
 	}
 
 	for _, opt := range opts {
@@ -86,7 +86,7 @@ func WithDriveID(id string) DriveOpt {
 // WithReadOnly sets the drive read-only
 func WithReadOnly(flag bool) DriveOpt {
 	return func(d *models.Drive) {
-		d.IsReadOnly = Bool(flag)
+		d.IsReadOnly = flag
 	}
 }
 

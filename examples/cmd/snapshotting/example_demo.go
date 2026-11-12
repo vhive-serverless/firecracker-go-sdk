@@ -96,8 +96,8 @@ func createNewConfig(socketPath string, opts ...configOpt) sdk.Config {
 			{
 				DriveID:      &driveID,
 				IsRootDevice: &isRootDevice,
-				IsReadOnly:   &isReadOnly,
-				PathOnHost:   &pathOnHost,
+				IsReadOnly:   isReadOnly,
+				PathOnHost:   pathOnHost,
 			},
 		},
 	}
@@ -308,8 +308,8 @@ func loadSnapshotSSH(ctx context.Context, socketPath, memPath, snapPath, ipToRes
 			{
 				DriveID:      &driveID,
 				IsRootDevice: &isRootDevice,
-				IsReadOnly:   &isReadOnly,
-				PathOnHost:   &rootfsPath,
+				IsReadOnly:   isReadOnly,
+				PathOnHost:   rootfsPath,
 			},
 		},
 		NetworkInterfaces: []sdk.NetworkInterface{

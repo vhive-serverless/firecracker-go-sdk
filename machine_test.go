@@ -25,6 +25,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -44,7 +45,6 @@ import (
 	models "github.com/firecracker-microvm/firecracker-go-sdk/client/models"
 	ops "github.com/firecracker-microvm/firecracker-go-sdk/client/operations"
 	"github.com/firecracker-microvm/firecracker-go-sdk/fctesting"
-	"github.com/firecracker-microvm/firecracker-go-sdk/internal"
 )
 
 const (
@@ -217,8 +217,8 @@ func TestJailerMicroVMExecution(t *testing.T) {
 			{
 				DriveID:      String("1"),
 				IsRootDevice: Bool(true),
-				IsReadOnly:   Bool(false),
-				PathOnHost:   String(rootdrivePath),
+				IsReadOnly:   false,
+				PathOnHost:   rootdrivePath,
 			},
 		},
 		JailerCfg: &JailerConfig{
@@ -258,7 +258,7 @@ func TestJailerMicroVMExecution(t *testing.T) {
 
 	for _, drive := range cfg.Drives {
 		driveImageInfo := syscall.Stat_t{}
-		drivePath := StringValue(drive.PathOnHost)
+		drivePath := drive.PathOnHost
 		if err := syscall.Stat(drivePath, &driveImageInfo); err != nil {
 			t.Fatalf("Failed to stat kernel image: %v", err)
 		}
@@ -572,9 +572,6 @@ func TestStartVMMOnce(t *testing.T) {
 			Smt:        Bool(false),
 		},
 	}
-	if cpu_temp, err := internal.SupportCPUTemplate(); cpu_temp && err == nil {
-		cfg.MachineCfg.CPUTemplate = models.CPUTemplate(models.CPUTemplateT2)
-	}
 	ctx := context.Background()
 	cmd := VMCommandBuilder{}.
 		WithSocketPath(cfg.SocketPath).
@@ -697,7 +694,7 @@ func testCreateBootSource(ctx context.Context, t *testing.T, m *Machine, vmlinux
 	//          filesystem available to the guest.
 	// Kernel command-line options can be found in the kernel source tree at
 	// Documentation/admin-guide/kernel-parameters.txt.
-	err := m.createBootSource(ctx, vmlinuxPath, "", "ro console=ttyS0 noapic reboot=k panic=0 pci=off nomodules")
+	err := m.createBootSource(ctx, vmlinuxPath, "", "ro console=ttyS0 reboot=k panic=0 pci=off nomodules")
 	if err != nil {
 		t.Errorf("failed to create boot source: %s", err)
 	}
@@ -752,8 +749,8 @@ func testAttachRootDrive(ctx context.Context, t *testing.T, m *Machine) {
 	drive := models.Drive{
 		DriveID:      String("0"),
 		IsRootDevice: Bool(true),
-		IsReadOnly:   Bool(true),
-		PathOnHost:   String(testRootfs),
+		IsReadOnly:   true,
+		PathOnHost:   testRootfs,
 	}
 	err := m.attachDrives(ctx, drive)
 	if err != nil {
@@ -765,8 +762,8 @@ func testAttachSecondaryDrive(ctx context.Context, t *testing.T, m *Machine) {
 	drive := models.Drive{
 		DriveID:      String("2"),
 		IsRootDevice: Bool(false),
-		IsReadOnly:   Bool(true),
-		PathOnHost:   String(filepath.Join(testDataPath, "drive-2.img")),
+		IsReadOnly:   true,
+		PathOnHost:   filepath.Join(testDataPath, "drive-2.img"),
 	}
 	err := m.attachDrive(ctx, drive)
 	if err != nil {
@@ -1102,8 +1099,8 @@ func TestLogFiles(t *testing.T) {
 			{
 				DriveID:      String("0"),
 				IsRootDevice: Bool(true),
-				IsReadOnly:   Bool(false),
-				PathOnHost:   String(testRootfs),
+				IsReadOnly:   false,
+				PathOnHost:   testRootfs,
 			},
 		},
 		DisableValidation: true,
@@ -1317,6 +1314,31 @@ func TestSocketPathSet(t *testing.T) {
 	}
 }
 
+func TestConfigureBuilderAddsFlags(t *testing.T) {
+	ctx := context.Background()
+	cfg := Config{
+		VMID:       "vmid",
+		SocketPath: "/tmp/fc.sock",
+		EnablePCI:  true,
+		LogModule:  "api_server::request",
+	}
+	cmd := configureBuilder(VMCommandBuilder{}.WithBin(getFirecrackerBinaryPath()), cfg).Build(ctx)
+	expected := []string{
+		getFirecrackerBinaryPath(),
+		"--api-sock",
+		"/tmp/fc.sock",
+		"--id",
+		"vmid",
+		"--no-seccomp",
+		"--enable-pci",
+		"--module",
+		"api_server::request",
+	}
+	if e, a := expected, cmd.Args; !reflect.DeepEqual(e, a) {
+		t.Errorf("expected args %v, but received %v", e, a)
+	}
+}
+
 func copyFile(src, dst string, uid, gid int) error {
 	srcFd, err := os.Open(src)
 	if err != nil {
@@ -1381,8 +1403,8 @@ func TestPID(t *testing.T) {
 			{
 				DriveID:      String("1"),
 				IsRootDevice: Bool(true),
-				IsReadOnly:   Bool(false),
-				PathOnHost:   String(rootfsPath),
+				IsReadOnly:   false,
+				PathOnHost:   rootfsPath,
 			},
 		},
 		DisableValidation: true,
@@ -1653,8 +1675,8 @@ func withRootDrive(rootfs string) machineConfigOpt {
 				drives = append(drives, models.Drive{
 					DriveID:      String("root"),
 					IsRootDevice: Bool(true),
-					IsReadOnly:   Bool(false),
-					PathOnHost:   String(rootfs),
+					IsReadOnly:   false,
+					PathOnHost:   rootfs,
 				})
 				inserted = true
 			} else {
@@ -1666,8 +1688,8 @@ func withRootDrive(rootfs string) machineConfigOpt {
 			drives = append(drives, models.Drive{
 				DriveID:      String("root"),
 				IsRootDevice: Bool(true),
-				IsReadOnly:   Bool(false),
-				PathOnHost:   String(rootfs),
+				IsReadOnly:   false,
+				PathOnHost:   rootfs,
 			})
 		}
 
@@ -1694,8 +1716,8 @@ func createValidConfig(t *testing.T, socketPath string, opts ...machineConfigOpt
 			{
 				DriveID:      String("root"),
 				IsRootDevice: Bool(true),
-				IsReadOnly:   Bool(true),
-				PathOnHost:   String(testRootfs),
+				IsReadOnly:   true,
+				PathOnHost:   testRootfs,
 			},
 		},
 	}
@@ -1729,8 +1751,8 @@ func TestSignalForwarding(t *testing.T) {
 			{
 				DriveID:      String("0"),
 				IsRootDevice: Bool(true),
-				IsReadOnly:   Bool(false),
-				PathOnHost:   String(testRootfs),
+				IsReadOnly:   false,
+				PathOnHost:   testRootfs,
 			},
 		},
 		DisableValidation: true,
@@ -2116,8 +2138,8 @@ func TestLoadSnapshot(t *testing.T) {
 						{
 							DriveID:      String("root"),
 							IsRootDevice: Bool(true),
-							IsReadOnly:   Bool(true),
-							PathOnHost:   String(testRootfs),
+							IsReadOnly:   true,
+							PathOnHost:   testRootfs,
 						},
 					},
 				}
@@ -2176,8 +2198,8 @@ func TestLoadSnapshot(t *testing.T) {
 						{
 							DriveID:      String("root"),
 							IsRootDevice: Bool(true),
-							IsReadOnly:   Bool(true),
-							PathOnHost:   String(testRootfs),
+							IsReadOnly:   true,
+							PathOnHost:   testRootfs,
 						},
 					},
 				}
@@ -2324,8 +2346,8 @@ func TestLoadSnapshot(t *testing.T) {
 						{
 							DriveID:      String("root"),
 							IsRootDevice: Bool(true),
-							IsReadOnly:   Bool(true),
-							PathOnHost:   String(rootfsPath),
+							IsReadOnly:   true,
+							PathOnHost:   rootfsPath,
 						},
 					},
 					NetworkInterfaces: []NetworkInterface{

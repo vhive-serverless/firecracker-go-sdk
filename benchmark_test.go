@@ -57,8 +57,8 @@ func createMachine(ctx context.Context, name string, forwardSignals []os.Signal)
 			{
 				DriveID:      String("root"),
 				IsRootDevice: Bool(true),
-				IsReadOnly:   Bool(true),
-				PathOnHost:   String(testRootfs),
+				IsReadOnly:   true,
+				PathOnHost:   testRootfs,
 			},
 		},
 		ForwardSignals: forwardSignals,

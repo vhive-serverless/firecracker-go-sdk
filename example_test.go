@@ -271,7 +271,7 @@ func ExampleJailerConfig_enablingJailer() {
 
 	// Check each drive is readable and writable
 	for _, drive := range fcCfg.Drives {
-		drivePath := firecracker.StringValue(drive.PathOnHost)
+		drivePath := drive.PathOnHost
 		f, err := os.OpenFile(drivePath, os.O_RDWR, 0666)
 		if err != nil {
 			panic(fmt.Errorf("Failed to open drive with read/write permissions: %v", err))

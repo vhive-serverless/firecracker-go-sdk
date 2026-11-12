@@ -413,8 +413,8 @@ func newCNIMachine(t *testing.T,
 			{
 				DriveID:      String("1"),
 				IsRootDevice: Bool(true),
-				IsReadOnly:   Bool(false),
-				PathOnHost:   String(rootfsPath),
+				IsReadOnly:   false,
+				PathOnHost:   rootfsPath,
 			},
 		},
 		NetworkInterfaces: []NetworkInterface{{

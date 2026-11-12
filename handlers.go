@@ -35,6 +35,9 @@ const (
 	SetupNetworkHandlerName            = "fcinit.SetupNetwork"
 	SetupKernelArgsHandlerName         = "fcinit.SetupKernelArgs"
 	CreateBalloonHandlerName           = "fcinit.CreateBalloon"
+	CreatePmemHandlerName              = "fcinit.CreatePmem"
+	CreateSerialHandlerName            = "fcinit.CreateSerial"
+	CreateMemoryHotplugHandlerName     = "fcinit.CreateMemoryHotplug"
 	LoadSnapshotHandlerName            = "fcinit.LoadSnapshot"
 
 	ValidateCfgHandlerName             = "validate.Cfg"
@@ -292,6 +295,33 @@ func NewCreateBalloonHandler(amountMib int64, deflateOnOom bool, StatsPollingInt
 	}
 }
 
+// CreatePmemHandler is a named handler that configures pmem devices if provided.
+var CreatePmemHandler = Handler{
+	Name: CreatePmemHandlerName,
+	Fn: func(ctx context.Context, m *Machine) error {
+		if len(m.Cfg.PmemDevices) == 0 {
+			return nil
+		}
+		return m.AddPmemDevices(ctx, m.Cfg.PmemDevices...)
+	},
+}
+
+// CreateSerialHandler is a named handler that configures the serial console output.
+var CreateSerialHandler = Handler{
+	Name: CreateSerialHandlerName,
+	Fn: func(ctx context.Context, m *Machine) error {
+		return m.ConfigureSerial(ctx, m.Cfg.SerialDevice)
+	},
+}
+
+// CreateMemoryHotplugHandler is a named handler that configures hotpluggable memory.
+var CreateMemoryHotplugHandler = Handler{
+	Name: CreateMemoryHotplugHandlerName,
+	Fn: func(ctx context.Context, m *Machine) error {
+		return m.ConfigureMemoryHotplug(ctx, m.Cfg.MemoryHotplug)
+	},
+}
+
 // LoadSnapshotHandler is a named handler that loads a snapshot
 // from the specified filepath
 var LoadSnapshotHandler = Handler{
@@ -310,6 +340,9 @@ var defaultFcInitHandlerList = HandlerList{}.Append(
 	CreateMachineHandler,
 	CreateBootSourceHandler,
 	AttachDrivesHandler,
+	CreatePmemHandler,
+	CreateSerialHandler,
+	CreateMemoryHotplugHandler,
 	CreateNetworkInterfacesHandler,
 	AddVsocksHandler,
 	ConfigMmdsHandler,
@@ -324,7 +357,11 @@ var loadSnapshotRemoveHandlerList = []Handler{
 	CreateMachineHandler,
 	CreateBootSourceHandler,
 	AttachDrivesHandler,
+	CreatePmemHandler,
+	CreateSerialHandler,
+	CreateMemoryHotplugHandler,
 	CreateNetworkInterfacesHandler,
+	AddVsocksHandler,
 	ConfigMmdsHandler,
 }
 

@@ -21,12 +21,12 @@ import (
 )
 
 var (
-	expectedAmountMib              = int64(6)
+	expectedAmountMib             = int64(6)
 	expectedDeflateOnOom          = true
 	expectedStatsPollingIntervals = int64(1)
 
 	expectedBalloon = models.Balloon{
-		AmountMib:              &expectedAmountMib,
+		AmountMib:             &expectedAmountMib,
 		DeflateOnOom:          &expectedDeflateOnOom,
 		StatsPollingIntervals: expectedStatsPollingIntervals,
 	}

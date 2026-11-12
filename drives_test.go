@@ -24,9 +24,9 @@ func TestDrivesBuilder(t *testing.T) {
 	expectedDrives := []models.Drive{
 		{
 			DriveID:      String(rootDriveName),
-			PathOnHost:   &expectedPath,
+			PathOnHost:   expectedPath,
 			IsRootDevice: Bool(true),
-			IsReadOnly:   Bool(false),
+			IsReadOnly:   false,
 		},
 	}
 
@@ -41,9 +41,9 @@ func TestDrivesBuilderWithRootDrive(t *testing.T) {
 	expectedDrives := []models.Drive{
 		{
 			DriveID:      String("foo"),
-			PathOnHost:   &expectedPath,
+			PathOnHost:   expectedPath,
 			IsRootDevice: Bool(true),
-			IsReadOnly:   Bool(false),
+			IsReadOnly:   false,
 		},
 	}
 
@@ -61,9 +61,9 @@ func TestDrivesBuilderWithCacheType(t *testing.T) {
 	expectedDrives := []models.Drive{
 		{
 			DriveID:      String("root_drive"),
-			PathOnHost:   &expectedPath,
+			PathOnHost:   expectedPath,
 			IsRootDevice: Bool(true),
-			IsReadOnly:   Bool(false),
+			IsReadOnly:   false,
 			CacheType:    String(expectedCacheType),
 		},
 	}
@@ -109,35 +109,35 @@ func TestDrivesBuilderAddDrive(t *testing.T) {
 	expectedDrives := []models.Drive{
 		{
 			DriveID:      String("0"),
-			PathOnHost:   String("/2"),
+			PathOnHost:   "/2",
 			IsRootDevice: Bool(false),
-			IsReadOnly:   Bool(true),
+			IsReadOnly:   true,
 		},
 		{
 			DriveID:      String("1"),
-			PathOnHost:   String("/3"),
+			PathOnHost:   "/3",
 			IsRootDevice: Bool(false),
-			IsReadOnly:   Bool(false),
+			IsReadOnly:   false,
 		},
 		{
 			DriveID:      String("2"),
-			PathOnHost:   String("/4"),
+			PathOnHost:   "/4",
 			IsRootDevice: Bool(false),
-			IsReadOnly:   Bool(false),
+			IsReadOnly:   false,
 			Partuuid:     "uuid",
 		},
 		{
 			DriveID:      String("3"),
-			PathOnHost:   String("/5"),
+			PathOnHost:   "/5",
 			IsRootDevice: Bool(false),
-			IsReadOnly:   Bool(true),
+			IsReadOnly:   true,
 			CacheType:    String(models.DriveCacheTypeWriteback),
 		},
 		{
 			DriveID:      String(rootDriveName),
-			PathOnHost:   &rootPath,
+			PathOnHost:   rootPath,
 			IsRootDevice: Bool(true),
-			IsReadOnly:   Bool(false),
+			IsReadOnly:   false,
 		},
 	}
 
@@ -162,9 +162,9 @@ func TestDrivesBuilderWithIoEngine(t *testing.T) {
 	expectedDrives := []models.Drive{
 		{
 			DriveID:      String(rootDriveName),
-			PathOnHost:   &expectedPath,
+			PathOnHost:   expectedPath,
 			IsRootDevice: Bool(true),
-			IsReadOnly:   Bool(false),
+			IsReadOnly:   false,
 			IoEngine:     &expectedVal,
 		},
 	}

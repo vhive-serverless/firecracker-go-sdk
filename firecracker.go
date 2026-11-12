@@ -294,6 +294,14 @@ func (f *Client) LoadSnapshot(ctx context.Context, snapshotParams *models.Snapsh
 	for _, opt := range opts {
 		opt(params)
 	}
+	// The release schema permits omission, but its generated model emits a nil
+	// slice as JSON null. Firecracker expects a sequence, including when empty.
+	// Copy the body so normalizing the wire representation does not mutate callers.
+	if params.Body != nil && params.Body.NetworkOverrides == nil {
+		body := *params.Body
+		body.NetworkOverrides = []*models.NetworkOverride{}
+		params.SetBody(&body)
+	}
 
 	return f.client.Operations.LoadSnapshot(params)
 }
@@ -506,6 +514,140 @@ func (f *Client) PatchBalloonStatsInterval(ctx context.Context, balloonStatsUpda
 	}
 
 	return f.client.Operations.PatchBalloonStatsInterval(params)
+}
+
+// StartBalloonHintingOpt is a functional option to be used for the StartBalloonHinting API.
+type StartBalloonHintingOpt func(*ops.StartBalloonHintingParams)
+
+// StartBalloonHinting starts a free page hinting run on the balloon device.
+func (f *Client) StartBalloonHinting(ctx context.Context, cmd *models.BalloonStartCmd, opts ...StartBalloonHintingOpt) (*ops.StartBalloonHintingNoContent, error) {
+	timeout, cancel := context.WithTimeout(ctx, time.Duration(f.firecrackerRequestTimeout)*time.Millisecond)
+	defer cancel()
+
+	params := ops.NewStartBalloonHintingParamsWithContext(timeout)
+	params.SetBody(cmd)
+	for _, opt := range opts {
+		opt(params)
+	}
+
+	return f.client.Operations.StartBalloonHinting(params)
+}
+
+// StopBalloonHintingOpt is a functional option to be used for the StopBalloonHinting API.
+type StopBalloonHintingOpt func(*ops.StopBalloonHintingParams)
+
+// StopBalloonHinting stops a free page hinting run on the balloon device.
+func (f *Client) StopBalloonHinting(ctx context.Context, opts ...StopBalloonHintingOpt) (*ops.StopBalloonHintingNoContent, error) {
+	timeout, cancel := context.WithTimeout(ctx, time.Duration(f.firecrackerRequestTimeout)*time.Millisecond)
+	defer cancel()
+
+	params := ops.NewStopBalloonHintingParamsWithContext(timeout)
+	for _, opt := range opts {
+		opt(params)
+	}
+
+	return f.client.Operations.StopBalloonHinting(params)
+}
+
+// DescribeBalloonHintingOpt is a functional option to be used for the DescribeBalloonHinting API.
+type DescribeBalloonHintingOpt func(*ops.DescribeBalloonHintingParams)
+
+// DescribeBalloonHinting retrieves the current free page hinting status.
+func (f *Client) DescribeBalloonHinting(ctx context.Context, opts ...DescribeBalloonHintingOpt) (*ops.DescribeBalloonHintingOK, error) {
+	timeout, cancel := context.WithTimeout(ctx, time.Duration(f.firecrackerRequestTimeout)*time.Millisecond)
+	defer cancel()
+
+	params := ops.NewDescribeBalloonHintingParamsWithContext(timeout)
+	for _, opt := range opts {
+		opt(params)
+	}
+
+	return f.client.Operations.DescribeBalloonHinting(params)
+}
+
+// PutGuestPmemByIDOpt is a functional option to be used for the PutGuestPmemByID API.
+type PutGuestPmemByIDOpt func(*ops.PutGuestPmemByIDParams)
+
+// PutGuestPmemByID creates or updates a pmem device by ID.
+func (f *Client) PutGuestPmemByID(ctx context.Context, id string, pmem *models.Pmem, opts ...PutGuestPmemByIDOpt) (*ops.PutGuestPmemByIDNoContent, error) {
+	timeout, cancel := context.WithTimeout(ctx, time.Duration(f.firecrackerRequestTimeout)*time.Millisecond)
+	defer cancel()
+
+	params := ops.NewPutGuestPmemByIDParamsWithContext(timeout)
+	params.SetID(id)
+	params.SetBody(pmem)
+	for _, opt := range opts {
+		opt(params)
+	}
+
+	return f.client.Operations.PutGuestPmemByID(params)
+}
+
+// PutSerialDeviceOpt is a functional option to be used for the PutSerialDevice API.
+type PutSerialDeviceOpt func(*ops.PutSerialDeviceParams)
+
+// PutSerialDevice configures the serial console.
+func (f *Client) PutSerialDevice(ctx context.Context, serial *models.SerialDevice, opts ...PutSerialDeviceOpt) (*ops.PutSerialDeviceNoContent, error) {
+	timeout, cancel := context.WithTimeout(ctx, time.Duration(f.firecrackerRequestTimeout)*time.Millisecond)
+	defer cancel()
+
+	params := ops.NewPutSerialDeviceParamsWithContext(timeout)
+	params.SetBody(serial)
+	for _, opt := range opts {
+		opt(params)
+	}
+
+	return f.client.Operations.PutSerialDevice(params)
+}
+
+// PutMemoryHotplugOpt is a functional option to be used for the PutMemoryHotplug API.
+type PutMemoryHotplugOpt func(*ops.PutMemoryHotplugParams)
+
+// PutMemoryHotplug configures the hotpluggable memory device.
+func (f *Client) PutMemoryHotplug(ctx context.Context, config *models.MemoryHotplugConfig, opts ...PutMemoryHotplugOpt) (*ops.PutMemoryHotplugNoContent, error) {
+	timeout, cancel := context.WithTimeout(ctx, time.Duration(f.firecrackerRequestTimeout)*time.Millisecond)
+	defer cancel()
+
+	params := ops.NewPutMemoryHotplugParamsWithContext(timeout)
+	params.SetBody(config)
+	for _, opt := range opts {
+		opt(params)
+	}
+
+	return f.client.Operations.PutMemoryHotplug(params)
+}
+
+// PatchMemoryHotplugOpt is a functional option to be used for the PatchMemoryHotplug API.
+type PatchMemoryHotplugOpt func(*ops.PatchMemoryHotplugParams)
+
+// PatchMemoryHotplug updates the size of the hotpluggable memory region.
+func (f *Client) PatchMemoryHotplug(ctx context.Context, update *models.MemoryHotplugSizeUpdate, opts ...PatchMemoryHotplugOpt) (*ops.PatchMemoryHotplugNoContent, error) {
+	timeout, cancel := context.WithTimeout(ctx, time.Duration(f.firecrackerRequestTimeout)*time.Millisecond)
+	defer cancel()
+
+	params := ops.NewPatchMemoryHotplugParamsWithContext(timeout)
+	params.SetBody(update)
+	for _, opt := range opts {
+		opt(params)
+	}
+
+	return f.client.Operations.PatchMemoryHotplug(params)
+}
+
+// GetMemoryHotplugOpt is a functional option to be used for the GetMemoryHotplug API.
+type GetMemoryHotplugOpt func(*ops.GetMemoryHotplugParams)
+
+// GetMemoryHotplug retrieves the status of the hotpluggable memory device.
+func (f *Client) GetMemoryHotplug(ctx context.Context, opts ...GetMemoryHotplugOpt) (*ops.GetMemoryHotplugOK, error) {
+	timeout, cancel := context.WithTimeout(ctx, time.Duration(f.firecrackerRequestTimeout)*time.Millisecond)
+	defer cancel()
+
+	params := ops.NewGetMemoryHotplugParamsWithContext(timeout)
+	for _, opt := range opts {
+		opt(params)
+	}
+
+	return f.client.Operations.GetMemoryHotplug(params)
 }
 
 type GetExportVMConfigOpt func(*ops.GetExportVMConfigParams)

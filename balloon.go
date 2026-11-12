@@ -27,7 +27,7 @@ type BalloonOpt func(*models.Balloon)
 // NewBalloonDevice will return a new BalloonDevice.
 func NewBalloonDevice(amountMib int64, deflateOnOom bool, opts ...BalloonOpt) BalloonDevice {
 	b := models.Balloon{
-		AmountMib:     &amountMib,
+		AmountMib:    &amountMib,
 		DeflateOnOom: &deflateOnOom,
 	}
 
