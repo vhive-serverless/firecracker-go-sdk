@@ -19,20 +19,28 @@ package models
 // Editing this file might prove futile when you re-run the swagger generate command
 
 import (
-	strfmt "github.com/go-openapi/strfmt"
+	"context"
 
 	"github.com/go-openapi/errors"
+	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
 	"github.com/go-openapi/validate"
 )
 
 // Metrics Describes the configuration option for the metrics capability.
+//
 // swagger:model Metrics
 type Metrics struct {
+
+	// Whether to emit the microVM instance id (the value passed to the jailer "--id") as a top-level "id" field on each metrics line.
+	EmitID *bool `json:"emit_id,omitempty"`
 
 	// Path to the named pipe or file where the JSON-formatted metrics are flushed.
 	// Required: true
 	MetricsPath *string `json:"metrics_path"`
+
+	// Operator-defined key-value pairs emitted under a top-level "properties" field on each metrics line.
+	Properties map[string]string `json:"properties,omitempty"`
 }
 
 // Validate validates this metrics
@@ -55,6 +63,11 @@ func (m *Metrics) validateMetricsPath(formats strfmt.Registry) error {
 		return err
 	}
 
+	return nil
+}
+
+// ContextValidate validates this metrics based on context it is used
+func (m *Metrics) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
 	return nil
 }
 

@@ -19,19 +19,27 @@ package models
 // Editing this file might prove futile when you re-run the swagger generate command
 
 import (
-	strfmt "github.com/go-openapi/strfmt"
+	"context"
+	"encoding/json"
+	stderrors "errors"
 
 	"github.com/go-openapi/errors"
+	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
 	"github.com/go-openapi/validate"
 )
 
-// MachineConfiguration Describes the number of vCPUs, memory size, SMT capabilities and the CPU template.
+// MachineConfiguration Describes the number of vCPUs, memory size, SMT capabilities, huge page configuration and the CPU template.
+//
 // swagger:model MachineConfiguration
 type MachineConfiguration struct {
 
 	// cpu template
-	CPUTemplate CPUTemplate `json:"cpu_template,omitempty"`
+	CPUTemplate *CPUTemplate `json:"cpu_template,omitempty"`
+
+	// Which huge pages configuration should be used to back guest memory. "None" uses regular 4K pages. "Transparent" enables THP via madvise(MADV_HUGEPAGE). "2M" uses explicit hugetlbfs 2MB pages.
+	// Enum: ["None","Transparent","2M"]
+	HugePages *string `json:"huge_pages,omitempty"`
 
 	// Memory size of VM
 	// Required: true
@@ -45,7 +53,6 @@ type MachineConfiguration struct {
 
 	// Number of vCPUs (either 1 or an even number)
 	// Required: true
-	// Maximum: 32
 	// Minimum: 1
 	VcpuCount *int64 `json:"vcpu_count"`
 }
@@ -55,6 +62,10 @@ func (m *MachineConfiguration) Validate(formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.validateCPUTemplate(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.validateHugePages(formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -73,15 +84,67 @@ func (m *MachineConfiguration) Validate(formats strfmt.Registry) error {
 }
 
 func (m *MachineConfiguration) validateCPUTemplate(formats strfmt.Registry) error {
-
 	if swag.IsZero(m.CPUTemplate) { // not required
 		return nil
 	}
 
-	if err := m.CPUTemplate.Validate(formats); err != nil {
-		if ve, ok := err.(*errors.Validation); ok {
-			return ve.ValidateName("cpu_template")
+	if m.CPUTemplate != nil {
+		if err := m.CPUTemplate.Validate(formats); err != nil {
+			ve := new(errors.Validation)
+			if stderrors.As(err, &ve) {
+				return ve.ValidateName("cpu_template")
+			}
+			ce := new(errors.CompositeError)
+			if stderrors.As(err, &ce) {
+				return ce.ValidateName("cpu_template")
+			}
+
+			return err
 		}
+	}
+
+	return nil
+}
+
+var machineConfigurationTypeHugePagesPropEnum []any
+
+func init() {
+	var res []string
+	if err := json.Unmarshal([]byte(`["None","Transparent","2M"]`), &res); err != nil {
+		panic(err)
+	}
+	for _, v := range res {
+		machineConfigurationTypeHugePagesPropEnum = append(machineConfigurationTypeHugePagesPropEnum, v)
+	}
+}
+
+const (
+
+	// MachineConfigurationHugePagesNone captures enum value "None"
+	MachineConfigurationHugePagesNone string = "None"
+
+	// MachineConfigurationHugePagesTransparent captures enum value "Transparent"
+	MachineConfigurationHugePagesTransparent string = "Transparent"
+
+	// MachineConfigurationHugePagesNr2M captures enum value "2M"
+	MachineConfigurationHugePagesNr2M string = "2M"
+)
+
+// prop value enum
+func (m *MachineConfiguration) validateHugePagesEnum(path, location string, value string) error {
+	if err := validate.EnumCase(path, location, value, machineConfigurationTypeHugePagesPropEnum, true); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (m *MachineConfiguration) validateHugePages(formats strfmt.Registry) error {
+	if swag.IsZero(m.HugePages) { // not required
+		return nil
+	}
+
+	// value enum
+	if err := m.validateHugePagesEnum("huge_pages", "body", *m.HugePages); err != nil {
 		return err
 	}
 
@@ -103,12 +166,47 @@ func (m *MachineConfiguration) validateVcpuCount(formats strfmt.Registry) error 
 		return err
 	}
 
-	if err := validate.MinimumInt("vcpu_count", "body", int64(*m.VcpuCount), 1, false); err != nil {
+	if err := validate.MinimumInt("vcpu_count", "body", *m.VcpuCount, 1, false); err != nil {
 		return err
 	}
 
-	if err := validate.MaximumInt("vcpu_count", "body", int64(*m.VcpuCount), 32, false); err != nil {
-		return err
+	return nil
+}
+
+// ContextValidate validate this machine configuration based on the context it is used
+func (m *MachineConfiguration) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
+	var res []error
+
+	if err := m.contextValidateCPUTemplate(ctx, formats); err != nil {
+		res = append(res, err)
+	}
+
+	if len(res) > 0 {
+		return errors.CompositeValidationError(res...)
+	}
+	return nil
+}
+
+func (m *MachineConfiguration) contextValidateCPUTemplate(ctx context.Context, formats strfmt.Registry) error {
+
+	if m.CPUTemplate != nil {
+
+		if swag.IsZero(m.CPUTemplate) { // not required
+			return nil
+		}
+
+		if err := m.CPUTemplate.ContextValidate(ctx, formats); err != nil {
+			ve := new(errors.Validation)
+			if stderrors.As(err, &ve) {
+				return ve.ValidateName("cpu_template")
+			}
+			ce := new(errors.CompositeError)
+			if stderrors.As(err, &ce) {
+				return ce.ValidateName("cpu_template")
+			}
+
+			return err
+		}
 	}
 
 	return nil

@@ -14,4 +14,7 @@
 package firecracker
 
 // Version represents the current version of the SDK.
-const Version = "1.0.0"
+const Version = "1.18.0"
+
+// FirecrackerRevision identifies the source of the generated API schema.
+const FirecrackerRevision = "eaf83bb718a559d324613d566eaf776b31a62340"

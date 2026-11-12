@@ -19,14 +19,16 @@ package models
 // Editing this file might prove futile when you re-run the swagger generate command
 
 import (
-	strfmt "github.com/go-openapi/strfmt"
+	"context"
 
 	"github.com/go-openapi/errors"
+	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
 	"github.com/go-openapi/validate"
 )
 
 // BalloonStats Describes the balloon device statistics.
+//
 // swagger:model BalloonStats
 type BalloonStats struct {
 
@@ -38,8 +40,23 @@ type BalloonStats struct {
 	// Required: true
 	ActualPages *int64 `json:"actual_pages"`
 
+	// Counter of Allocation enter a slow path to gain more memory page. The reclaim/scan metrics can reveal what is actually happening.
+	AllocStall int64 `json:"alloc_stall,omitempty"`
+
+	// Amount of memory reclaimed asynchronously.
+	AsyncReclaim int64 `json:"async_reclaim,omitempty"`
+
+	// Amount of memory scanned asynchronously.
+	AsyncScan int64 `json:"async_scan,omitempty"`
+
 	// An estimate of how much memory is available (in bytes) for starting new applications, without pushing the system to swap.
 	AvailableMemory int64 `json:"available_memory,omitempty"`
+
+	// Amount of memory reclaimed directly.
+	DirectReclaim int64 `json:"direct_reclaim,omitempty"`
+
+	// Amount of memory scanned directly.
+	DirectScan int64 `json:"direct_scan,omitempty"`
 
 	// The amount of memory, in bytes, that can be quickly reclaimed without additional I/O. Typically these pages are used for caching files from disk.
 	DiskCaches int64 `json:"disk_caches,omitempty"`
@@ -58,6 +75,9 @@ type BalloonStats struct {
 
 	// The number of minor page faults that have occurred.
 	MinorFaults int64 `json:"minor_faults,omitempty"`
+
+	// OOM killer invocations, indicating critical memory pressure.
+	OomKill int64 `json:"oom_kill,omitempty"`
 
 	// The amount of memory that has been swapped in (in bytes).
 	SwapIn int64 `json:"swap_in,omitempty"`
@@ -136,6 +156,11 @@ func (m *BalloonStats) validateTargetPages(formats strfmt.Registry) error {
 		return err
 	}
 
+	return nil
+}
+
+// ContextValidate validates this balloon stats based on context it is used
+func (m *BalloonStats) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
 	return nil
 }
 

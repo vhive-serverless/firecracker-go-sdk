@@ -19,34 +19,44 @@ package models
 // Editing this file might prove futile when you re-run the swagger generate command
 
 import (
+	"context"
 	"encoding/json"
-
-	strfmt "github.com/go-openapi/strfmt"
+	stderrors "errors"
 
 	"github.com/go-openapi/errors"
+	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
 	"github.com/go-openapi/validate"
 )
 
 // Drive drive
+//
 // swagger:model Drive
 type Drive struct {
 
+	// Logical block size advertised to the guest via VIRTIO_BLK_F_BLK_SIZE. This field is optional for virtio-block config and should be omitted for vhost-user-block configuration.
+	BlkSize *int64 `json:"blk_size,omitempty"`
+
 	// Represents the caching strategy for the block device.
-	// Enum: [Unsafe Writeback]
+	// Enum: ["Unsafe","Writeback"]
 	CacheType *string `json:"cache_type,omitempty"`
+
+	// Enables virtio-blk discard support. When enabled, the guest can issue discard/TRIM requests for this drive. Only supported for writable virtio-block devices using the Sync IO engine. This field is optional for virtio-block config and should be omitted for vhost-user-block configuration.
+	Discard *bool `json:"discard,omitempty"`
+
+	// dmb size mib
+	DmbSizeMib DmbSizeMib `json:"dmb_size_mib,omitempty"`
 
 	// drive id
 	// Required: true
 	DriveID *string `json:"drive_id"`
 
-	// Type of the IO engine used by the device. "Async" is supported on host kernels newer than 5.10.51.
-	// Enum: [Sync Async]
+	// Type of the IO engine used by the device. "Async" is supported on host kernels newer than 5.10.51. This field is optional for virtio-block config and should be omitted for vhost-user-block configuration.
+	// Enum: ["Sync","Async"]
 	IoEngine *string `json:"io_engine,omitempty"`
 
-	// is read only
-	// Required: true
-	IsReadOnly *bool `json:"is_read_only"`
+	// Is block read only. This field is required for virtio-block config and should be omitted for vhost-user-block configuration.
+	IsReadOnly bool `json:"is_read_only,omitempty"`
 
 	// is root device
 	// Required: true
@@ -55,12 +65,17 @@ type Drive struct {
 	// Represents the unique id of the boot partition of this device. It is optional and it will be taken into account only if the is_root_device field is true.
 	Partuuid string `json:"partuuid,omitempty"`
 
-	// Host level path for the guest drive
-	// Required: true
-	PathOnHost *string `json:"path_on_host"`
+	// Host level path for the guest drive. This field is required for virtio-block config and should be omitted for vhost-user-block configuration.
+	PathOnHost string `json:"path_on_host,omitempty"`
 
 	// rate limiter
 	RateLimiter *RateLimiter `json:"rate_limiter,omitempty"`
+
+	// Path to the socket of vhost-user-block backend. This field is required for vhost-user-block config should be omitted for virtio-block configuration.
+	Socket string `json:"socket,omitempty"`
+
+	// topology
+	Topology *BlockTopology `json:"topology,omitempty"`
 }
 
 // Validate validates this drive
@@ -68,6 +83,10 @@ func (m *Drive) Validate(formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.validateCacheType(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.validateDmbSizeMib(formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -79,19 +98,15 @@ func (m *Drive) Validate(formats strfmt.Registry) error {
 		res = append(res, err)
 	}
 
-	if err := m.validateIsReadOnly(formats); err != nil {
-		res = append(res, err)
-	}
-
 	if err := m.validateIsRootDevice(formats); err != nil {
 		res = append(res, err)
 	}
 
-	if err := m.validatePathOnHost(formats); err != nil {
+	if err := m.validateRateLimiter(formats); err != nil {
 		res = append(res, err)
 	}
 
-	if err := m.validateRateLimiter(formats); err != nil {
+	if err := m.validateTopology(formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -101,7 +116,7 @@ func (m *Drive) Validate(formats strfmt.Registry) error {
 	return nil
 }
 
-var driveTypeCacheTypePropEnum []interface{}
+var driveTypeCacheTypePropEnum []any
 
 func init() {
 	var res []string
@@ -124,20 +139,40 @@ const (
 
 // prop value enum
 func (m *Drive) validateCacheTypeEnum(path, location string, value string) error {
-	if err := validate.Enum(path, location, value, driveTypeCacheTypePropEnum); err != nil {
+	if err := validate.EnumCase(path, location, value, driveTypeCacheTypePropEnum, true); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (m *Drive) validateCacheType(formats strfmt.Registry) error {
-
 	if swag.IsZero(m.CacheType) { // not required
 		return nil
 	}
 
 	// value enum
 	if err := m.validateCacheTypeEnum("cache_type", "body", *m.CacheType); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *Drive) validateDmbSizeMib(formats strfmt.Registry) error {
+	if swag.IsZero(m.DmbSizeMib) { // not required
+		return nil
+	}
+
+	if err := m.DmbSizeMib.Validate(formats); err != nil {
+		ve := new(errors.Validation)
+		if stderrors.As(err, &ve) {
+			return ve.ValidateName("dmb_size_mib")
+		}
+		ce := new(errors.CompositeError)
+		if stderrors.As(err, &ce) {
+			return ce.ValidateName("dmb_size_mib")
+		}
+
 		return err
 	}
 
@@ -153,7 +188,7 @@ func (m *Drive) validateDriveID(formats strfmt.Registry) error {
 	return nil
 }
 
-var driveTypeIoEnginePropEnum []interface{}
+var driveTypeIoEnginePropEnum []any
 
 func init() {
 	var res []string
@@ -176,29 +211,19 @@ const (
 
 // prop value enum
 func (m *Drive) validateIoEngineEnum(path, location string, value string) error {
-	if err := validate.Enum(path, location, value, driveTypeIoEnginePropEnum); err != nil {
+	if err := validate.EnumCase(path, location, value, driveTypeIoEnginePropEnum, true); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (m *Drive) validateIoEngine(formats strfmt.Registry) error {
-
 	if swag.IsZero(m.IoEngine) { // not required
 		return nil
 	}
 
 	// value enum
 	if err := m.validateIoEngineEnum("io_engine", "body", *m.IoEngine); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (m *Drive) validateIsReadOnly(formats strfmt.Registry) error {
-
-	if err := validate.Required("is_read_only", "body", m.IsReadOnly); err != nil {
 		return err
 	}
 
@@ -214,26 +239,139 @@ func (m *Drive) validateIsRootDevice(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *Drive) validatePathOnHost(formats strfmt.Registry) error {
-
-	if err := validate.Required("path_on_host", "body", m.PathOnHost); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (m *Drive) validateRateLimiter(formats strfmt.Registry) error {
-
 	if swag.IsZero(m.RateLimiter) { // not required
 		return nil
 	}
 
 	if m.RateLimiter != nil {
 		if err := m.RateLimiter.Validate(formats); err != nil {
-			if ve, ok := err.(*errors.Validation); ok {
+			ve := new(errors.Validation)
+			if stderrors.As(err, &ve) {
 				return ve.ValidateName("rate_limiter")
 			}
+			ce := new(errors.CompositeError)
+			if stderrors.As(err, &ce) {
+				return ce.ValidateName("rate_limiter")
+			}
+
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (m *Drive) validateTopology(formats strfmt.Registry) error {
+	if swag.IsZero(m.Topology) { // not required
+		return nil
+	}
+
+	if m.Topology != nil {
+		if err := m.Topology.Validate(formats); err != nil {
+			ve := new(errors.Validation)
+			if stderrors.As(err, &ve) {
+				return ve.ValidateName("topology")
+			}
+			ce := new(errors.CompositeError)
+			if stderrors.As(err, &ce) {
+				return ce.ValidateName("topology")
+			}
+
+			return err
+		}
+	}
+
+	return nil
+}
+
+// ContextValidate validate this drive based on the context it is used
+func (m *Drive) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
+	var res []error
+
+	if err := m.contextValidateDmbSizeMib(ctx, formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.contextValidateRateLimiter(ctx, formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.contextValidateTopology(ctx, formats); err != nil {
+		res = append(res, err)
+	}
+
+	if len(res) > 0 {
+		return errors.CompositeValidationError(res...)
+	}
+	return nil
+}
+
+func (m *Drive) contextValidateDmbSizeMib(ctx context.Context, formats strfmt.Registry) error {
+
+	if swag.IsZero(m.DmbSizeMib) { // not required
+		return nil
+	}
+
+	if err := m.DmbSizeMib.ContextValidate(ctx, formats); err != nil {
+		ve := new(errors.Validation)
+		if stderrors.As(err, &ve) {
+			return ve.ValidateName("dmb_size_mib")
+		}
+		ce := new(errors.CompositeError)
+		if stderrors.As(err, &ce) {
+			return ce.ValidateName("dmb_size_mib")
+		}
+
+		return err
+	}
+
+	return nil
+}
+
+func (m *Drive) contextValidateRateLimiter(ctx context.Context, formats strfmt.Registry) error {
+
+	if m.RateLimiter != nil {
+
+		if swag.IsZero(m.RateLimiter) { // not required
+			return nil
+		}
+
+		if err := m.RateLimiter.ContextValidate(ctx, formats); err != nil {
+			ve := new(errors.Validation)
+			if stderrors.As(err, &ve) {
+				return ve.ValidateName("rate_limiter")
+			}
+			ce := new(errors.CompositeError)
+			if stderrors.As(err, &ce) {
+				return ce.ValidateName("rate_limiter")
+			}
+
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (m *Drive) contextValidateTopology(ctx context.Context, formats strfmt.Registry) error {
+
+	if m.Topology != nil {
+
+		if swag.IsZero(m.Topology) { // not required
+			return nil
+		}
+
+		if err := m.Topology.ContextValidate(ctx, formats); err != nil {
+			ve := new(errors.Validation)
+			if stderrors.As(err, &ve) {
+				return ve.ValidateName("topology")
+			}
+			ce := new(errors.CompositeError)
+			if stderrors.As(err, &ce) {
+				return ce.ValidateName("topology")
+			}
+
 			return err
 		}
 	}
