@@ -14,7 +14,6 @@
 package vsock
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -195,7 +194,7 @@ func tryConnect(logger *logrus.Entry, udsPath string, port uint32, c config) (ne
 }
 
 // tryConnReadUntil will try to do a read from the provided conn until the specified
-// end character is encounteed. Returning an error if the read does not complete
+// end character is encountered. Returning an error if the read does not complete
 // within the provided timeout. It will reset socket deadlines to none after returning.
 // It's only intended to be used for connect/ack messages, not general purpose reads
 // after the vsock connection is established fully.
@@ -203,7 +202,21 @@ func tryConnReadUntil(conn net.Conn, end byte, timeout time.Duration) (string, e
 	conn.SetDeadline(time.Now().Add(timeout))
 	defer conn.SetDeadline(time.Time{})
 
-	return bufio.NewReaderSize(conn, 32).ReadString(end)
+	// A valid ACK ("OK " plus a uint32 port and newline) fits in 14 bytes.
+	// Bound malformed replies while leaving room for the existing wire format.
+	const maxAckMsgLen = 32
+	var msg [maxAckMsgLen]byte
+	for i := range msg {
+		// The guest can send application bytes immediately after the ACK. Read
+		// exactly one byte so none are prefetched and discarded at the delimiter.
+		if _, err := io.ReadFull(conn, msg[i:i+1]); err != nil {
+			return string(msg[:i]), err
+		}
+		if msg[i] == end {
+			return string(msg[:i+1]), nil
+		}
+	}
+	return string(msg[:]), fmt.Errorf("vsock acknowledgement exceeds %d bytes", maxAckMsgLen)
 }
 
 // tryConnWrite will try to do a write to the provided conn, returning an error if
