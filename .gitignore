@@ -11,3 +11,6 @@ testdata/bin/
 testdata/logs/
 testdata/ltag
 testdata/release-*
+testdata/root-drive-with-ssh.img
+testdata/root-drive-ssh-key*
+testdata/ubuntu-24.04.squashfs
